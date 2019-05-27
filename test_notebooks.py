@@ -137,7 +137,7 @@ def check_notebook(filename, all_sol_vars):
         return True
 
     # Load the notebook file
-    with open(filename) as file:
+    with open(filename, encoding='utf-8') as file:
         nb = nbformat.read(file, as_version=4)
 
     # Keep only the code cells (and especially remove the raw cells)
@@ -147,6 +147,7 @@ def check_notebook(filename, all_sol_vars):
     exporter = PythonExporter()
     source, meta = exporter.from_notebook_node(nb)
     source = re.sub('(.*?)get_ipython', r'#\1get_ipython', source)  # Comment out code lines which are only available in ipython
+    source = re.sub('^(plotly\.offline)', r'#\1', source, flags=re.MULTILINE)  # Disable Plotly commands since they may cause problems
 
     # Run the student's solution
     stud_vars = {}
@@ -190,7 +191,9 @@ def version_info():
     return versions
 
 
-def check_folder():
+def check_cwd():
+    print('Current working directory: ' + os.getcwd())
+
     folder_name = os.path.basename(os.getcwd())
     print('Testing all notebooks in the folder ' + folder_name)
 
@@ -234,11 +237,20 @@ def check_folder():
         print(f'{colorama.Fore.GREEN}Congratulations! The checked notebooks in the folder %s match with the reference implementation.{colorama.Style.RESET_ALL}\n' % folder_name)
 
 
+def check_folder(folder):
+    prev_cwd = os.getcwd()
+    os.chdir(folder)  # Notebooks should be executed in their corresponding folder
+    sys.path.append(os.getcwd())  # Modules of the folder should be accessible
+
+    check_cwd()
+
+    os.chdir(prev_cwd)
+
 colorama.init()
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-                                 description='This script tests all notebooks in one or more folders. Requirement is that the respective folder contains a file with the name solution_vars.pickle which contains the solution variables of the notebooks.')
+                                 description='This script tests all notebooks in one or more folders. Requirement is that the respective folder contains a file with the name solution_vars.pickle which contains the solution variables of the notebooks (a folder may contain multiple notebooks). The idea is that each folder contains all notebooks from one assignment.')
 parser.add_argument('folders', type=str, nargs='*', default='.', help='Folders to check (each with its own solution file). If no folder name is given, the current folder is used.')
-__version__ = '0.7.7'
+__version__ = '0.7.10'
 parser.add_argument('--version', action='version', version='%(prog)s ' + __version__)
 
 args = parser.parse_args()
@@ -246,10 +258,4 @@ print(os.path.basename(__file__) + ' ' + __version__)
 
 # Check all notebooks in the given folder name(s)
 for folder in args.folders:
-    prev_cwd = os.getcwd()
-    os.chdir(folder)  # Notebooks should be executed in their corresponding folder
-    sys.path.append(os.getcwd())  # Modules of the folder should be accessible
-
-    check_folder()
-
-    os.chdir(prev_cwd)
+    check_folder(folder)
